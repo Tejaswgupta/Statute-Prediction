@@ -1,7 +1,9 @@
-
-from openai import AzureOpenAI
+import requests, uuid, json
+from openai import AzureOpenAI,OpenAI
 import re
 import gradio as gr
+import csv
+import random
 
 client = AzureOpenAI(
     api_key="e5a86e5ac7ce453a8fae2dcbfaafbef7", 
@@ -9,42 +11,23 @@ client = AzureOpenAI(
     azure_endpoint="https://votum.openai.azure.com/",
 )
 
+mistral_client = OpenAI(
+    api_key='EMPTY',
+    base_url="http://20.124.240.6:8083/v1",
+)
 
-fact = '''In service Mr. In-charge Inspector Mr. City of Police Station Kotwali Mr. G Candidate Chetna Gupta alias Chanchal Gupta Advocate Resident of Flat No., 76/44 Halsey Road Kanpur Nagar and practicing law from a pucca chamber just in front of CMO office at Kachehri. On 2024, at around 8: 30 am, my chamber suddenly caught fire and at around 9: 00 am, I got a call informing me that my chamber was on fire. I reached the chamber immediately. By then, Manish, who was cleaning my chamber, was dousing the fire with water. All my chamber's luggage, files, AC, sofa wings, amalt glass walls, necessary documents, miscellaneous items, etc. have been destroyed. I am informing the concerned post. Please take appropriate action. Dated 29. 2024 Signature English unreadable Candidate Chetna Gupta alias Chanchal Gupta Md. 7376222267 Note I hereby certify that 674 Dhirendra Pratap Singh, permanent & tahrir copy of the complaint was literally typed by me on the computer 5057 Lalit Kumar. That I attest to.'''
 
-prompt = """Task: Given examples of a Supreme Court case and the statutes applied in that case, your objective is to make accurate predictions of the specific charge or statute that is most likely to be applied within the context of the case delimited by triple backticks (```), ensuring exact predictions and learning from the provided examples.You should only include the statutes it is most confident about.The response format should include the statutes applied as in the context.
-                            You should to showcase creativity and knowledge to enhance the accuracy of statute predictions based on the given fact statement.
+fact_example = '''In service Mr. In-charge Inspector Mr. City of Police Station Kotwali Mr. G Candidate Chetna Gupta alias Chanchal Gupta Advocate Resident of Flat No., 76/44 Halsey Road Kanpur Nagar and practicing law from a pucca chamber just in front of CMO office at Kachehri. On 2024, at around 8: 30 am, my chamber suddenly caught fire and at around 9: 00 am, I got a call informing me that my chamber was on fire. I reached the chamber immediately. By then, Manish, who was cleaning my chamber, was dousing the fire with water. All my chamber's luggage, files, AC, sofa wings, amalt glass walls, necessary documents, miscellaneous items, etc. have been destroyed. I am informing the concerned post. Please take appropriate action. Dated 29. 2024 Signature English unreadable Candidate Chetna Gupta alias Chanchal Gupta Md. 7376222267 Note I hereby certify that 674 Dhirendra Pratap Singh, permanent & tahrir copy of the complaint was literally typed by me on the computer 5057 Lalit Kumar. That I attest to.''' 
+
+prompt = """Task: Given examples of an FIR and the statutes applied in that case, your objective is to make accurate predictions of the specific charge or statute that is most likely to be applied within the context of the case delimited by triple backticks (```), ensuring exact predictions and learning from the provided examples.You should only include the statutes it is most confident about.The response format should include the statutes applied as in the context.
+You should to showcase creativity and knowledge to enhance the accuracy of statute predictions based on the given fact statement.
 
 Context:
+-----
+Fact Statement:"Nakal Tahrir Hindi Plaintiff Service in Mr. SHO Sir Police Station Akrawad District Aligarh Sir, today on 24/4/2021, I along with Deputy Inspector Kapil Dev Maya Hamrah Ka0 406 Narsingh was in the police station area in the police station area to effectively follow the preventive action and public to follow the public in connection with the election. Ravindra Giri, a candidate for the post of panchayat member, along with his supporters, has violated the rules of code of conduct and public care by violating Section 144 CrPC by violating Section 144 CrPC by violating the campaign vehicle UP 86 T 5771 MAX without any permission in his favor with his supporters. In which there was full possibility of spreading the infection, the documents of the said vehicle were asked from the candidate Ravindra Giri, then the vehicle number UP 86 T 5771 was seized under section 207 MV Act and Gavendra Giri son of Moti Giri and Jitendra Giri son of Ramprakash Giri and Gaurav Giri son of Jugendra Giri Ni0 Gana Kathera police station Vijaygarh district Aligarh and Yogesh Kumar son of Rajendra Singh Ni0wari police station Vijaygarh district Aligarh The offence of IPC reaches the extent of Section 188/269/171 C IPC and Epidemic Act. Sir, I request you to please register a case against the said accused and take necessary action. S.C. English U.P. Kapil Dev 24/4/21 Kapil Dev SI PS Akrawad Aligarh In the note CC 686 Yashpal Singh certifies that the copy of Tahrir has been marked as word and word."
 
-Fact Statement:"In this one gets used to writing common orders, for orders are written either on behalf of the [PRODUCT], or on behalf of the [ORG].
-While endorsing the opinion expressed by [PERSON],, adjudicating upon the prayer for my recusal, from hearing the matters in hand, reasons for my continuation on the [ORG], also need to be expressed by me.
-It has been necessitated, for deciding an objection, about the present composition of the [PERSON].
-As already noted above,, [ORG] has rendered the decision on the objection.
-The events which followed the order of [PERSON],, are also of some significance.
-In my considered view, they too need to be narrated, for only then, the entire matter can be considered to have been fully expressed, as it ought to be.
-I also need to record reasons, why my continuation on the reconstituted [ORG], was the only course open to me.
-And therefore, my side of its understanding, dealing with the perception, of the other side of the [PRODUCT].
-Union of India [DATE] Indlaw SCO 185 Writ Petition C no.13 of, Mr. [PERSON], Senior Advocate, in [ORG] of [DATE], Mr. [PERSON], Advocate, in [ORG] Indlaw SC 29 Writ Petition C [DATE] and Mr. [PERSON], Advocate, in Change [GPE] v. [ORG] no.70 of [DATE], representing the petitioners were heard.iii The proceedings recorded by this [ORG] on 18.3.2015 reveal, that Mr. [PERSON], in Writ Petition C no.70 of [DATE] was heard again on, whereupon, Mr. [PERSON] and Mr., [ORG] [GPE], also made their submissions.
-[CARDINAL]. Based on the order passed by the Judge [PERSON] on 7.4.2015, Honble the Chief Justice of [GPE], constituted a [CARDINAL] Judge [PERSON], comprising of,,, and, JJ.
-[CARDINAL]. On 13.4.2015 the Constitution Ninety ninth Amendment Act, [DATE], and [ORG] Act, [DATE], were notified in the Gazette of India Extraordinary.Both the above enactments, were brought into force with effect from 13.4.2015.
-[CARDINAL]. When the reconstituted [PERSON] commenced hearing on 21.4.2015, Mr. made a prayer for my recusal from the [PRODUCT], which was seconded by Mr. Mathews [PERSON] petitioner in- person in Writ Petition C no.124 of [DATE], the latter advanced submissions, even though he had been barred from doing so, by an earlier order dated 24.3.2015 extracted above.
-The [ORDINAL] judgment was rendered, by a [CARDINAL] Judge [PERSON], by a majority of [CARDINAL], in the [ORDINAL] Judges case on [CARDINAL]. The correctness of the First Judges case was doubted by a Judge [PERSON] in of [GPE], [DATE] Supp 1 SCC 574 [ORG] [CARDINAL], which opined that the majority view, in the [ORG] case, should be considered by a larger.
-The amendment, received the assent of the President on [DATE].It was however given effect to, with effect from 13.4.2015 consequent upon its notification in the Gazette of India Extraordinary Part II, [SECTION_UNK].
-The same was also brought into force, with effect from 13.4.2015 by its notification in the Gazette of India Extraordinary Part II, [SECTION_UNK].
-The Judges case- [DATE] [EVENT] 87 [DATE] [ORG] [CARDINAL].[DATE].The Union Law Minister addressed a letter dated 18.3.1981 to the Governor of [PRODUCT] and to Chief Ministers of all other [GPE].
-The addressees were inter [PERSON], [CARDINAL] of [ORG], should as far as possible be from outside the in which is situated.
-Through the above letter, the addressees were requested to.a obtain from all additional Judges working in the High Courts.their consent to be appointed as permanent Judges in any other in the country.
-The above noted letter required, that the concerned appointees.be required to name [CARDINAL] High Courts, in order of preference, to which they would prefer to be appointed as permanent Judges and b obtain from persons who have already been or may in the future be proposed by you for initial appointment their consent to be appointed to any other [ORG] in the country along with a similar preference for [CARDINAL] High Courts.
-The Union Law Minister, in the above letter clarified, that furnishing of their consent or indication of their preference, would not imply any commitment, at the behest of the Government, to accommodate them in accordance with their preferences.
-In response, quite a few additional Judges, gave their consent to be appointed outside their parent [ORG].
-A series of [ORG] in [GPE] passed resolutions, condemning the letter dated 18.3.1981, as being subversive of judicial independence.
-Since that was not done, a writ petition was filed by the above Associations in the Bombay High Court, challenging the letter dated 18.3.1981.
-An interim order was passed by [ORG], restraining the Union Law Minister and the Government from implementing the letter dated 18.3.1981.
-While the matter was pending before this, the Union Law Minister and, filed a transfer petition under [LAW] The transfer petition was allowed, and the writ petition filed in the Bombay High Court, was transferred to [ORG].
-These short term appointments were assailed, as being unjustified under [LAW], besides being subversive of the independence of the judiciary."
-
-Statutes:['Constitution_226', 'Constitution_136', 'Constitution_14', 'Constitution_16', 'Constitution_227', 'Constitution_133', 'Constitution_246', 'Constitution_1', 'Constitution_21', 'Constitution_32', 'Constitution_19', 'Constitution_141', 'Constitution_4', 'Constitution_31', 'Constitution_12', 'Constitution_2', 'Constitution_39', 'Constitution_311', 'Constitution_13', 'Constitution_5', 'Constitution_3', 'Constitution_6', 'Constitution_15']
+Statutes:['IPC_188', 'IPC_269', 'IPC_171C', 'The_Motor_Vehicles_Act_1988_207']
+-----
 
 ###
 
@@ -55,21 +38,22 @@ Instructions:
 
 Learn from the examples provided in the context to understand the task of charge or statute prediction.
 Your response should be focused on providing the exact statute or charge that aligns with the legal principles and precedents applicable to the given facts.
-In your response, include only the statutes you are most confident about.Ensure that the statutes generated as responses are valid and recognized legal statutes. Avoid generating fabricated or invalid statutes.
-The model's performance will be evaluated based on its ability to predict the correct statute, include only confident statutes, and showcase creativity in its predictions.
+In your response, include only the statutes you are most confident about.Ensure that the statutes generated as responses are valid and recognized legal statutes applicable in FIRs. In certain cases you can also apply sections from special acts including but not limited to 'The_Arms_Act_27' , 'The_Motor_Vehicles_Act_1988', 'Dowry_Prohibition_Act_1961', like 'Dowry_Prohibition_Act_1961_3'. Avoid generating fabricated or invalid statutes.
+The model's performance will be evaluated based on its ability to predict the correct statute, include only confident statutes.
+Think step by step to cover all possible statutes that are relevant to the fact statement.
 
 Fact Statement: ```{fact}```
 """
 
 def generate(input_text):
-    print(input_text)
-    
     com = prompt.format(fact=input_text)
-    chat_completion = client.chat.completions.create(
-        model="gpt-4-turbo",
-        temperature=0.5,
+    print(input_text)
+    chat_completion = mistral_client.chat.completions.create(
+        # model="gpt-4-turbo",
+        model='Qwen/Qwen1.5-72B-Chat-GPTQ-Int4',
+        temperature=0.3,
         messages=[
-                {"role": "system", "content": "You are a legal assistant from India, skilled in and tagging applicable legal statutes to FIR(First Information Report)."},
+                {"role": "system", "content": "You are a helpful assistant who is expert in tagging FIRs with relevant statutes from IPC among other special acts."},
             {
                 "role": "user",
                 "content": com,
@@ -87,24 +71,96 @@ def extract_statutes(gpt_output):
         return statutes
     return []  
 
+def translate(text):
+    # Add your key and endpoint
+    key = "8760fcb757fe44a19d3ec590cb80836f"
+    endpoint = "https://api.cognitive.microsofttranslator.com"
 
-def predict_statutes(fir_text):  
-    if fir_text:  
-        gpt_output = generate(fir_text)  
+    # location, also known as region.
+    # required if you're using a multi-service or regional (not global) resource. It can be found in the Azure portal on the Keys and Endpoint page.
+    location = "centralindia"
+
+    path = '/translate'
+    constructed_url = endpoint + path
+
+    params = {
+        'api-version': '3.0',
+        'from': 'hi',
+        'to': 'en',
+    }
+
+    headers = {
+        'Ocp-Apim-Subscription-Key': key,
+        'Ocp-Apim-Subscription-Region': location,
+        'Content-type': 'application/json',
+        'X-ClientTraceId': str(uuid.uuid4())
+    }
+
+    # You can pass more than one object in body.
+    body = [{
+        'text': text
+    }]
+
+    request = requests.post(constructed_url, params=params, headers=headers, json=body)
+    return request.json()[0]['translations'][0]['text']
+
+
+  
+  
+
+def get_random_sample():
+    filename = "Apr.csv"  # Replace 'your_file.csv' with your actual file path
+    with open(filename, 'r', newline='') as csvfile:
+        # Step 3: Read all rows into a list
+        reader = csv.reader(csvfile)
+        rows = [row for row in reader]
+
+        # Step 4: Generate a random index
+        random_index = random.randint(0, len(rows) - 1)
+        print(ra)
+
+        # Step 5: Retrieve the row at the random index
+        random_row = rows[random_index]
+
+        # Step 6: Print or process the random row
+        return random_row
+
+example = get_random_sample()
+
+
+def predict_statutes(fir_text,language):  
+    if language == 'Hindi':
+        text = translate(fir_text)
+    else:
+        text = fir_text
+    
+    ac_statute= example[-1] if fir_text==example[5] else ''
+    
+    if text:  
+        gpt_output = generate(text)  
         statutes_list = extract_statutes(gpt_output)  
         if statutes_list:  
-            return "\n".join(f"- {statute}" for statute in statutes_list)  
+            return ("\n".join(f"- {statute}" for statute in statutes_list),ac_statute)
         else:  
-            return "No statutes were predicted. Please check the FIR text and try again."  
+            return ("No statutes were predicted. Please check the FIR text and try again.",ac_statute)
     else:  
-        return "Please enter the FIR text to predict statutes."  
-  
-# Gradio app layout  
-demo = gr.Interface(  
+        return ("Please enter the FIR text to predict statutes.",ac_statute)
+
+demo = gr.Interface(
+    title='Statute Prediction',
+    description='Uses AI to analyze the FIR content and intelligently predict applicable statutes',
     fn=predict_statutes,  
-    inputs=gr.Textbox(label="Enter the FIR:", placeholder="Type or paste the FIR here...", lines=10),  
-    outputs=gr.Textbox(label="Predicted Statutes"),  
-    examples=[fact],  
+    inputs=[gr.Textbox(label="Enter the FIR:", placeholder="Type or paste the FIR here...", lines=10),   
+            gr.Dropdown(label="Select Language", choices=["English", "Hindi"], value="English"),
+            # gr.Slider(minimum=0.1,maximum=1.0,value=0.5,step=0.1),
+            ],
+    outputs=[gr.Textbox(label="Predicted Statutes"),gr.Textbox(label="Actual Statutes",value=example[-1])],  
+    examples=[[example[5], "English"]],  
 )  
   
-demo.launch(server_name='0.0.0.0',server_port=7862)  
+demo.launch()
+
+
+
+#  GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7862 gradio gradio_app.py 
+
