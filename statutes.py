@@ -203,3 +203,55 @@ async def main():
     await conn.close()
 
 asyncio.run(main())
+
+
+# async def process_case_wrapper(row, semaphore):  
+#     async with semaphore:  # Control concurrency with a semaphore  
+#         await process_case(row)  
+  
+# async def main():  
+#     conn = await asyncpg.connect(  
+#         host="legalscraperserver.postgres.database.azure.com",  
+#         database="postgres",  
+#         user="tejasw",  
+#         password="Password1234",  
+#         port=5432,  
+#     )  
+      
+#     rows = await conn.fetch(  
+#         '''  
+#         SELECT *  
+#         FROM records  
+#         WHERE court_name = 'Supreme Court of India'  
+#         ORDER BY TO_DATE(date_of_decision, 'DD-MM-YYYY') DESC  
+#         LIMIT 50;  
+#         '''  
+#     )  
+      
+#     max_concurrent_tasks = 15  
+#     min_remaining_tasks = 5  
+#     semaphore = asyncio.Semaphore(max_concurrent_tasks)  
+      
+#     tasks = set()  
+#     for r in rows:  
+#         if len(tasks) < max_concurrent_tasks:  
+#             task = asyncio.create_task(process_case_wrapper(r, semaphore))  
+#             tasks.add(task)  
+          
+#         # Only remove tasks when they are done.  
+#         done_tasks = set()  
+#         for t in tasks:  
+#             if t.done():  
+#                 done_tasks.add(t)  
+#         tasks -= done_tasks  
+          
+#         # If the number of tasks is less than the threshold, wait until one of them is finished.  
+#         if len(tasks) <= min_remaining_tasks:  
+#             await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)  
+      
+#     # Wait for any outstanding tasks to complete  
+#     if tasks:  
+#         await asyncio.gather(*tasks)  
+  
+# loop = asyncio.get_event_loop()  
+# loop.run_until_complete(main())  
